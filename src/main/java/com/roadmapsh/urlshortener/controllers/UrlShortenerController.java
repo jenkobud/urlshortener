@@ -6,11 +6,15 @@ import com.roadmapsh.urlshortener.dtos.responses.UrlShortenerStatsResponse;
 import com.roadmapsh.urlshortener.errors.InvalidUrlException;
 import com.roadmapsh.urlshortener.errors.UrlNotFoundException;
 import com.roadmapsh.urlshortener.services.UrlShortenerService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.Serializable;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -19,13 +23,20 @@ public class UrlShortenerController {
 
     @Autowired private UrlShortenerService urlShortenerService;
 
+    Logger log = LoggerFactory.getLogger(UrlShortenerController.class);
+
     @PostMapping
-    public ResponseEntity<UrlShortenerResponse> createShortUrl(@RequestBody UrlShortenerRequest request) {
+    public ResponseEntity<Object> createShortUrl(@RequestBody UrlShortenerRequest request) {
+        log.info("Starting shortening of {}", request.getUrl());
         try {
+            if (request.getUrl() == null || request.getUrl().isEmpty()) {
+                throw new InvalidUrlException("URL cannot be empty nor NULL.");
+            }
             UrlShortenerResponse response = urlShortenerService.createShortUrl(request);
             return new ResponseEntity<>(response, HttpStatus.CREATED);
         } catch (InvalidUrlException e) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+            Map<String, String> error = Map.of("error", e.getMessage());
+            return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
         }
     }
 

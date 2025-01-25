@@ -12,7 +12,8 @@ public class MonitorController {
     @GetMapping
     public ResponseEntity<Object> status() {
         //TODO returns if the server is online and it,s details, such as: online/offline, started datetime, deployed version, time since online, resources consummed out of available.
-        throw new RuntimeException("NOT IMPLEMENTED YET.");
+
+        return ResponseEntity.ok("ONLINE");
     }
 
     //TODO Add services health
