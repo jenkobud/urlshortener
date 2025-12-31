@@ -1,11 +1,13 @@
 package com.roadmapsh.urlshortener.controllers;
 
 import com.roadmapsh.urlshortener.dtos.requests.UrlShortenerRequest;
+import com.roadmapsh.urlshortener.dtos.responses.ErrorResponse;
 import com.roadmapsh.urlshortener.dtos.responses.UrlShortenerResponse;
 import com.roadmapsh.urlshortener.dtos.responses.UrlShortenerStatsResponse;
 import com.roadmapsh.urlshortener.errors.InvalidUrlException;
 import com.roadmapsh.urlshortener.errors.UrlNotFoundException;
 import com.roadmapsh.urlshortener.services.UrlShortenerService;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.Serializable;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
 
@@ -21,22 +24,23 @@ import java.util.Optional;
 @RequestMapping("/shorten")
 public class UrlShortenerController {
 
-    @Autowired private UrlShortenerService urlShortenerService;
+    private final UrlShortenerService urlShortenerService;
 
-    Logger log = LoggerFactory.getLogger(UrlShortenerController.class);
+    private Logger log = LoggerFactory.getLogger(UrlShortenerController.class);
+
+    public UrlShortenerController(UrlShortenerService urlShortenerService) {
+        this.urlShortenerService = urlShortenerService;
+    }
 
     @PostMapping
-    public ResponseEntity<Object> createShortUrl(@RequestBody UrlShortenerRequest request) {
+    public ResponseEntity<Object> createShortUrl(@RequestBody @Valid UrlShortenerRequest request) {
         log.info("Starting shortening of {}", request.getUrl());
         try {
-            if (request.getUrl() == null || request.getUrl().isEmpty()) {
-                throw new InvalidUrlException("URL cannot be empty nor NULL.");
-            }
             UrlShortenerResponse response = urlShortenerService.createShortUrl(request);
             return new ResponseEntity<>(response, HttpStatus.CREATED);
         } catch (InvalidUrlException e) {
-            Map<String, String> error = Map.of("error", e.getMessage());
-            return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+            ErrorResponse err = new ErrorResponse(LocalDateTime.now(), 400, e.getErrorCode() , e.getMessage(), "/shorten");
+            return new ResponseEntity<>(err, HttpStatus.BAD_REQUEST);
         }
     }
 
