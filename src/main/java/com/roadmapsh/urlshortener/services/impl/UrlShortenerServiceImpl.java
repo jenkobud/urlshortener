@@ -6,7 +6,10 @@ import com.roadmapsh.urlshortener.dtos.responses.UrlShortenerResponse;
 import com.roadmapsh.urlshortener.dtos.responses.UrlShortenerStatsResponse;
 import com.roadmapsh.urlshortener.errors.InvalidUrlException;
 import com.roadmapsh.urlshortener.errors.UrlNotFoundException;
+import com.roadmapsh.urlshortener.mappers.UrlShortenerMapper;
+import com.roadmapsh.urlshortener.models.UrlShortener;
 import com.roadmapsh.urlshortener.services.UrlShortenerService;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -39,9 +42,16 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
     }
     @Override
     public Optional<UrlShortenerResponse> getOriginalUrl(String shortCode) {
-        // TODO - Implement logic to retrieve the original URL by short code
-        throw new RuntimeException("NOT IMPLEMENTE");
+        UrlShortener shortenerModel = urlShortenerDAO.getReferenceById(shortCode);
+        try {
+            UrlShortenerResponse response = UrlShortenerMapper.fromModelToDto(shortenerModel);
+            return Optional.of(response);
+        } catch (Exception e) {
+            log.error("Error retrieving original URL for short code {}: {}", shortCode, e.getMessage());
+            return Optional.empty();
+        }
     }
+
     @Override
     public UrlShortenerResponse updateShortUrl(String shortCode, UrlShortenerRequest request) throws InvalidUrlException, UrlNotFoundException {
         // TODO - Implement URL validation and update logic
