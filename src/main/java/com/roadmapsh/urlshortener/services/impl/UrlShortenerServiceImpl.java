@@ -100,9 +100,15 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
         return UrlShortenerMapper.fromModelToDto(saved);
     }
     @Override
+    @Transactional
     public void deleteShortUrl(String shortCode) throws UrlNotFoundException {
-        // TODO - Implement logic to delete the short URL by short code
-        throw new RuntimeException("NOT IMPLEMENTE");
+        if (!urlShortenerDAO.existsById(shortCode)) {
+            log.warn("Attempted to delete non-existent short code: {}", shortCode);
+            throw new UrlNotFoundException("Short code not found: " + shortCode);
+        }
+        
+        urlShortenerDAO.deleteById(shortCode);
+        log.info("Deleted short URL with code: {}", shortCode);
     }
     @Override
     public Optional<UrlShortenerStatsResponse> getUrlStatistics(String shortCode) {

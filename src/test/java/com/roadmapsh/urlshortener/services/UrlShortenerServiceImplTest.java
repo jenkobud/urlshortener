@@ -201,4 +201,30 @@ class UrlShortenerServiceImplTest {
         assertThrows(InvalidUrlException.class, () -> service.updateShortUrl("abc123", request));
         verify(urlShortenerDAO, never()).findById(any());
     }
+
+    @Test
+    void deleteShortUrl_shouldDeleteSuccessfully_whenShortCodeExists() throws UrlNotFoundException {
+        // Arrange
+        String shortCode = "abc123";
+        when(urlShortenerDAO.existsById(shortCode)).thenReturn(true);
+
+        // Act
+        service.deleteShortUrl(shortCode);
+
+        // Assert
+        verify(urlShortenerDAO).existsById(shortCode);
+        verify(urlShortenerDAO).deleteById(shortCode);
+    }
+
+    @Test
+    void deleteShortUrl_shouldThrowUrlNotFoundException_whenShortCodeDoesNotExist() {
+        // Arrange
+        String shortCode = "nonexistent";
+        when(urlShortenerDAO.existsById(shortCode)).thenReturn(false);
+
+        // Act & Assert
+        assertThrows(UrlNotFoundException.class, () -> service.deleteShortUrl(shortCode));
+        verify(urlShortenerDAO).existsById(shortCode);
+        verify(urlShortenerDAO, never()).deleteById(any());
+    }
 }
