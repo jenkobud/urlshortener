@@ -14,6 +14,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -101,6 +104,48 @@ class UrlShortenerServiceImplTest {
         RuntimeException ex = assertThrows(RuntimeException.class, () -> service.createShortUrl(request));
         assertTrue(ex.getMessage().contains("Failed to generate unique short code"));
         verify(shortCodeGenerator, times(3)).generate();
+        verify(urlShortenerDAO, never()).save(any());
+    }
+
+    @Test
+    void getOriginalUrl_shouldReturnResponseAndIncrementCounter_whenShortCodeExists() {
+        // Arrange
+        String shortCode = "abc123";
+        UrlShortener entity = new UrlShortener();
+        entity.setShortCode(shortCode);
+        entity.setUrl("https://example.com/original");
+        entity.setCreationDate(LocalDateTime.now());
+        entity.setUpdatedDate(LocalDateTime.now());
+        entity.setAccessedTimes(5);
+        
+        when(urlShortenerDAO.findById(shortCode)).thenReturn(Optional.of(entity));
+        when(urlShortenerDAO.save(any(UrlShortener.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        Optional<UrlShortenerResponse> result = service.getOriginalUrl(shortCode);
+
+        // Assert
+        assertTrue(result.isPresent());
+        assertEquals("https://example.com/original", result.get().getUrl());
+        assertEquals(shortCode, result.get().getShortCode());
+        
+        // Verify accessedTimes was incremented
+        ArgumentCaptor<UrlShortener> captor = ArgumentCaptor.forClass(UrlShortener.class);
+        verify(urlShortenerDAO).save(captor.capture());
+        assertEquals(6, captor.getValue().getAccessedTimes());
+    }
+
+    @Test
+    void getOriginalUrl_shouldReturnEmpty_whenShortCodeDoesNotExist() {
+        // Arrange
+        String shortCode = "nonexistent";
+        when(urlShortenerDAO.findById(shortCode)).thenReturn(Optional.empty());
+
+        // Act
+        Optional<UrlShortenerResponse> result = service.getOriginalUrl(shortCode);
+
+        // Assert
+        assertFalse(result.isPresent());
         verify(urlShortenerDAO, never()).save(any());
     }
 }

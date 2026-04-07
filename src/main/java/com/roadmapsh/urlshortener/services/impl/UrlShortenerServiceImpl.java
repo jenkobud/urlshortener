@@ -62,15 +62,23 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
         throw new RuntimeException("Failed to generate unique short code after " + MAX_RETRIES + " attempts");
     }
     @Override
+    @Transactional
     public Optional<UrlShortenerResponse> getOriginalUrl(String shortCode) {
-        UrlShortener shortenerModel = urlShortenerDAO.getReferenceById(shortCode);
-        try {
-            UrlShortenerResponse response = UrlShortenerMapper.fromModelToDto(shortenerModel);
-            return Optional.of(response);
-        } catch (Exception e) {
-            log.error("Error retrieving original URL for short code {}: {}", shortCode, e.getMessage());
+        Optional<UrlShortener> entityOpt = urlShortenerDAO.findById(shortCode);
+        
+        if (entityOpt.isEmpty()) {
+            log.debug("Short code not found: {}", shortCode);
             return Optional.empty();
         }
+        
+        UrlShortener entity = entityOpt.get();
+        entity.setAccessedTimes(entity.getAccessedTimes() + 1);
+        entity.setUpdatedDate(LocalDateTime.now());
+        
+        UrlShortener updated = urlShortenerDAO.save(entity);
+        log.info("URL accessed for shortCode: {}, new access count: {}", shortCode, updated.getAccessedTimes());
+        
+        return Optional.of(UrlShortenerMapper.fromModelToDto(updated));
     }
 
     @Override
