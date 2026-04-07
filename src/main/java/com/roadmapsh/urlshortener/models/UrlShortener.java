@@ -7,6 +7,7 @@ import lombok.ToString;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -23,6 +24,9 @@ public class UrlShortener {
     private LocalDateTime creationDate;
     private LocalDateTime updatedDate;
     private int accessedTimes;
+    
+    @Version
+    private Long version;
 
     @Override
     public final boolean equals(Object o) {
