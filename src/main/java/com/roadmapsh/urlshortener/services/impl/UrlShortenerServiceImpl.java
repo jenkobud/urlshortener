@@ -9,10 +9,11 @@ import com.roadmapsh.urlshortener.errors.UrlNotFoundException;
 import com.roadmapsh.urlshortener.mappers.UrlShortenerMapper;
 import com.roadmapsh.urlshortener.models.UrlShortener;
 import com.roadmapsh.urlshortener.services.UrlShortenerService;
-import jakarta.validation.Valid;
+import com.roadmapsh.urlshortener.utils.ShortCodeGenerator;
+import com.roadmapsh.urlshortener.utils.UrlValidator;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -21,24 +22,44 @@ import java.util.Optional;
 @Service
 public class UrlShortenerServiceImpl implements UrlShortenerService {
 
-    private final UrlShortenerDAO urlShortenerDAO;
+    private static final int MAX_RETRIES = 3;
 
-    public UrlShortenerServiceImpl(UrlShortenerDAO urlShortenerDAO) {
+    private final UrlShortenerDAO urlShortenerDAO;
+    private final ShortCodeGenerator shortCodeGenerator;
+
+    public UrlShortenerServiceImpl(UrlShortenerDAO urlShortenerDAO, ShortCodeGenerator shortCodeGenerator) {
         this.urlShortenerDAO = urlShortenerDAO;
+        this.shortCodeGenerator = shortCodeGenerator;
     }
 
     @Override
+    @Transactional
     public UrlShortenerResponse createShortUrl(UrlShortenerRequest request) throws InvalidUrlException {
-        //TODO Implement URL validation and short code generation logic
-        String hash = request.getUrl().hashCode() + "";
-        log.info("Shortening URL: {} to: {}", request.getUrl(), hash);
-        UrlShortenerResponse response = new UrlShortenerResponse();
-        response.setId("0");
-        response.setShortCode(hash);
-        response.setUrl(request.getUrl());
-        response.setCreatedAt(LocalDateTime.now());
-
-        return response;
+        UrlValidator.validate(request.getUrl());
+        
+        String shortCode = generateUniqueShortCode();
+        log.info("Shortening URL: {} to: {}", request.getUrl(), shortCode);
+        
+        UrlShortener entity = new UrlShortener();
+        entity.setShortCode(shortCode);
+        entity.setUrl(request.getUrl());
+        entity.setCreationDate(LocalDateTime.now());
+        entity.setUpdatedDate(LocalDateTime.now());
+        entity.setAccessedTimes(0);
+        
+        UrlShortener saved = urlShortenerDAO.save(entity);
+        return UrlShortenerMapper.fromModelToDto(saved);
+    }
+    
+    private String generateUniqueShortCode() {
+        for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
+            String code = shortCodeGenerator.generate();
+            if (!urlShortenerDAO.existsById(code)) {
+                return code;
+            }
+            log.warn("Short code collision detected: {}, retrying...", code);
+        }
+        throw new RuntimeException("Failed to generate unique short code after " + MAX_RETRIES + " attempts");
     }
     @Override
     public Optional<UrlShortenerResponse> getOriginalUrl(String shortCode) {
