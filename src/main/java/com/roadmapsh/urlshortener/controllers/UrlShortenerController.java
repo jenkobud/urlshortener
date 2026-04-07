@@ -76,4 +76,16 @@ public class UrlShortenerController {
         return response.map(statsResponse -> new ResponseEntity<>(statsResponse, HttpStatus.OK))
                 .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
+
+    @ExceptionHandler(jakarta.persistence.OptimisticLockException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLockException(jakarta.persistence.OptimisticLockException e) {
+        ErrorResponse err = new ErrorResponse(
+            LocalDateTime.now(), 
+            409, 
+            "CONFLICT", 
+            "Resource was modified by another request. Please retry.", 
+            "/shorten"
+        );
+        return new ResponseEntity<>(err, HttpStatus.CONFLICT);
+    }
 }
