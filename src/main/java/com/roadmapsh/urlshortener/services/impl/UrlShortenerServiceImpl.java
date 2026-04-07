@@ -82,10 +82,22 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
     }
 
     @Override
+    @Transactional
     public UrlShortenerResponse updateShortUrl(String shortCode, UrlShortenerRequest request) throws InvalidUrlException, UrlNotFoundException {
-        // TODO - Implement URL validation and update logic
-        // Return the updated UrlShortenerResponse
-        throw new RuntimeException("NOT IMPLEMENTE");
+        UrlValidator.validate(request.getUrl());
+        
+        Optional<UrlShortener> optionalEntity = urlShortenerDAO.findById(shortCode);
+        
+        if (optionalEntity.isEmpty()) {
+            throw new UrlNotFoundException("Short code not found: " + shortCode);
+        }
+        
+        UrlShortener entity = optionalEntity.get();
+        entity.setUrl(request.getUrl());
+        entity.setUpdatedDate(LocalDateTime.now());
+        
+        UrlShortener saved = urlShortenerDAO.save(entity);
+        return UrlShortenerMapper.fromModelToDto(saved);
     }
     @Override
     public void deleteShortUrl(String shortCode) throws UrlNotFoundException {
