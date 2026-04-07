@@ -3,6 +3,7 @@ package com.roadmapsh.urlshortener.services;
 import com.roadmapsh.urlshortener.daos.UrlShortenerDAO;
 import com.roadmapsh.urlshortener.dtos.requests.UrlShortenerRequest;
 import com.roadmapsh.urlshortener.dtos.responses.UrlShortenerResponse;
+import com.roadmapsh.urlshortener.dtos.responses.UrlShortenerStatsResponse;
 import com.roadmapsh.urlshortener.errors.InvalidUrlException;
 import com.roadmapsh.urlshortener.errors.UrlNotFoundException;
 import com.roadmapsh.urlshortener.models.UrlShortener;
@@ -226,5 +227,40 @@ class UrlShortenerServiceImplTest {
         assertThrows(UrlNotFoundException.class, () -> service.deleteShortUrl(shortCode));
         verify(urlShortenerDAO).existsById(shortCode);
         verify(urlShortenerDAO, never()).deleteById(any());
+    }
+
+    @Test
+    void getUrlStatistics_shouldReturnStatsResponse_whenShortCodeExists() {
+        // Arrange
+        UrlShortener entity = new UrlShortener();
+        entity.setShortCode("abc123");
+        entity.setUrl("https://example.com");
+        entity.setCreationDate(LocalDateTime.now());
+        entity.setUpdatedDate(LocalDateTime.now());
+        entity.setAccessedTimes(42);
+
+        when(urlShortenerDAO.findById("abc123")).thenReturn(Optional.of(entity));
+
+        // Act
+        Optional<UrlShortenerStatsResponse> response = service.getUrlStatistics("abc123");
+
+        // Assert
+        assertTrue(response.isPresent());
+        assertEquals("abc123", response.get().getShortCode());
+        assertEquals(42, response.get().getAccessCount());
+        verify(urlShortenerDAO, never()).save(any()); // Should not save for stats retrieval
+    }
+
+    @Test
+    void getUrlStatistics_shouldReturnEmpty_whenShortCodeDoesNotExist() {
+        // Arrange
+        when(urlShortenerDAO.findById("notexist")).thenReturn(Optional.empty());
+
+        // Act
+        Optional<UrlShortenerStatsResponse> response = service.getUrlStatistics("notexist");
+
+        // Assert
+        assertFalse(response.isPresent());
+        verify(urlShortenerDAO, never()).save(any());
     }
 }

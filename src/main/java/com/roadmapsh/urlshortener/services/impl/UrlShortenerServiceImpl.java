@@ -111,8 +111,15 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
         log.info("Deleted short URL with code: {}", shortCode);
     }
     @Override
+    @Transactional(readOnly = true)
     public Optional<UrlShortenerStatsResponse> getUrlStatistics(String shortCode) {
-        // TODO - IAutowired mplement logic to retrieve URL statistics by short code
-        throw new RuntimeException("NOT IMPLEMENTE");
+        Optional<UrlShortener> optionalEntity = urlShortenerDAO.findById(shortCode);
+        
+        if (optionalEntity.isEmpty()) {
+            log.debug("Short code not found for statistics: {}", shortCode);
+            return Optional.empty();
+        }
+        
+        return Optional.of(UrlShortenerMapper.fromModelToStatsDto(optionalEntity.get()));
     }
 }
