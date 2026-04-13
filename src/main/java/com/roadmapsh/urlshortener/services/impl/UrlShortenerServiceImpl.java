@@ -9,10 +9,11 @@ import com.roadmapsh.urlshortener.errors.UrlNotFoundException;
 import com.roadmapsh.urlshortener.mappers.UrlShortenerMapper;
 import com.roadmapsh.urlshortener.models.UrlShortener;
 import com.roadmapsh.urlshortener.services.UrlShortenerService;
-import jakarta.validation.Valid;
+import com.roadmapsh.urlshortener.utils.ShortCodeGenerator;
+import com.roadmapsh.urlshortener.utils.UrlValidator;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -21,51 +22,104 @@ import java.util.Optional;
 @Service
 public class UrlShortenerServiceImpl implements UrlShortenerService {
 
+    private static final int MAX_RETRIES = 3;
+
     private final UrlShortenerDAO urlShortenerDAO;
+    private final ShortCodeGenerator shortCodeGenerator;
 
-    public UrlShortenerServiceImpl(UrlShortenerDAO urlShortenerDAO) {
+    public UrlShortenerServiceImpl(UrlShortenerDAO urlShortenerDAO, ShortCodeGenerator shortCodeGenerator) {
         this.urlShortenerDAO = urlShortenerDAO;
+        this.shortCodeGenerator = shortCodeGenerator;
     }
 
     @Override
+    @Transactional
     public UrlShortenerResponse createShortUrl(UrlShortenerRequest request) throws InvalidUrlException {
-        //TODO Implement URL validation and short code generation logic
-        String hash = request.getUrl().hashCode() + "";
-        log.info("Shortening URL: {} to: {}", request.getUrl(), hash);
-        UrlShortenerResponse response = new UrlShortenerResponse();
-        response.setId("0");
-        response.setShortCode(hash);
-        response.setUrl(request.getUrl());
-        response.setCreatedAt(LocalDateTime.now());
-
-        return response;
+        UrlValidator.validate(request.getUrl());
+        
+        String shortCode = generateUniqueShortCode();
+        log.info("Shortening URL: {} to: {}", request.getUrl(), shortCode);
+        
+        UrlShortener entity = new UrlShortener();
+        entity.setShortCode(shortCode);
+        entity.setUrl(request.getUrl());
+        entity.setCreationDate(LocalDateTime.now());
+        entity.setUpdatedDate(LocalDateTime.now());
+        entity.setAccessedTimes(0);
+        
+        UrlShortener saved = urlShortenerDAO.save(entity);
+        return UrlShortenerMapper.fromModelToDto(saved);
+    }
+    
+    private String generateUniqueShortCode() {
+        for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
+            String code = shortCodeGenerator.generate();
+            if (!urlShortenerDAO.existsById(code)) {
+                return code;
+            }
+            log.warn("Short code collision detected: {}, retrying...", code);
+        }
+        throw new RuntimeException("Failed to generate unique short code after " + MAX_RETRIES + " attempts");
     }
     @Override
+    @Transactional
     public Optional<UrlShortenerResponse> getOriginalUrl(String shortCode) {
-        UrlShortener shortenerModel = urlShortenerDAO.getReferenceById(shortCode);
-        try {
-            UrlShortenerResponse response = UrlShortenerMapper.fromModelToDto(shortenerModel);
-            return Optional.of(response);
-        } catch (Exception e) {
-            log.error("Error retrieving original URL for short code {}: {}", shortCode, e.getMessage());
+        Optional<UrlShortener> entityOpt = urlShortenerDAO.findById(shortCode);
+        
+        if (entityOpt.isEmpty()) {
+            log.debug("Short code not found: {}", shortCode);
             return Optional.empty();
         }
+        
+        UrlShortener entity = entityOpt.get();
+        entity.setAccessedTimes(entity.getAccessedTimes() + 1);
+        entity.setUpdatedDate(LocalDateTime.now());
+        
+        UrlShortener updated = urlShortenerDAO.save(entity);
+        log.info("URL accessed for shortCode: {}, new access count: {}", shortCode, updated.getAccessedTimes());
+        
+        return Optional.of(UrlShortenerMapper.fromModelToDto(updated));
     }
 
     @Override
+    @Transactional
     public UrlShortenerResponse updateShortUrl(String shortCode, UrlShortenerRequest request) throws InvalidUrlException, UrlNotFoundException {
-        // TODO - Implement URL validation and update logic
-        // Return the updated UrlShortenerResponse
-        throw new RuntimeException("NOT IMPLEMENTE");
+        UrlValidator.validate(request.getUrl());
+        
+        Optional<UrlShortener> optionalEntity = urlShortenerDAO.findById(shortCode);
+        
+        if (optionalEntity.isEmpty()) {
+            throw new UrlNotFoundException("Short code not found: " + shortCode);
+        }
+        
+        UrlShortener entity = optionalEntity.get();
+        entity.setUrl(request.getUrl());
+        entity.setUpdatedDate(LocalDateTime.now());
+        
+        UrlShortener saved = urlShortenerDAO.save(entity);
+        return UrlShortenerMapper.fromModelToDto(saved);
     }
     @Override
+    @Transactional
     public void deleteShortUrl(String shortCode) throws UrlNotFoundException {
-        // TODO - Implement logic to delete the short URL by short code
-        throw new RuntimeException("NOT IMPLEMENTE");
+        if (!urlShortenerDAO.existsById(shortCode)) {
+            log.warn("Attempted to delete non-existent short code: {}", shortCode);
+            throw new UrlNotFoundException("Short code not found: " + shortCode);
+        }
+        
+        urlShortenerDAO.deleteById(shortCode);
+        log.info("Deleted short URL with code: {}", shortCode);
     }
     @Override
+    @Transactional(readOnly = true)
     public Optional<UrlShortenerStatsResponse> getUrlStatistics(String shortCode) {
-        // TODO - IAutowired mplement logic to retrieve URL statistics by short code
-        throw new RuntimeException("NOT IMPLEMENTE");
+        Optional<UrlShortener> optionalEntity = urlShortenerDAO.findById(shortCode);
+        
+        if (optionalEntity.isEmpty()) {
+            log.debug("Short code not found for statistics: {}", shortCode);
+            return Optional.empty();
+        }
+        
+        return Optional.of(UrlShortenerMapper.fromModelToStatsDto(optionalEntity.get()));
     }
 }

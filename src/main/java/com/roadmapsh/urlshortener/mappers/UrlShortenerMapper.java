@@ -1,6 +1,7 @@
 package com.roadmapsh.urlshortener.mappers;
 
 import com.roadmapsh.urlshortener.dtos.responses.UrlShortenerResponse;
+import com.roadmapsh.urlshortener.dtos.responses.UrlShortenerStatsResponse;
 import com.roadmapsh.urlshortener.models.UrlShortener;
 import jakarta.validation.constraints.NotNull;
 
@@ -12,10 +13,22 @@ public final class UrlShortenerMapper {
 
     public static UrlShortenerResponse fromModelToDto(@NotNull UrlShortener urlShortener) {
         UrlShortenerResponse dto = new UrlShortenerResponse();
+        dto.setId(urlShortener.getShortCode());
         dto.setShortCode(urlShortener.getShortCode());
         dto.setUrl(urlShortener.getUrl());
         dto.setCreatedAt(urlShortener.getCreationDate());
         dto.setUpdatedAt(urlShortener.getUpdatedDate());
+        return dto;
+    }
+
+    public static UrlShortenerStatsResponse fromModelToStatsDto(@NotNull UrlShortener urlShortener) {
+        UrlShortenerStatsResponse dto = new UrlShortenerStatsResponse();
+        dto.setId(urlShortener.getShortCode());
+        dto.setShortCode(urlShortener.getShortCode());
+        dto.setUrl(urlShortener.getUrl());
+        dto.setCreatedAt(urlShortener.getCreationDate());
+        dto.setUpdatedAt(urlShortener.getUpdatedDate());
+        dto.setAccessCount(urlShortener.getAccessedTimes());
         return dto;
     }
 }
